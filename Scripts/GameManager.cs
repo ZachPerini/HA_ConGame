@@ -55,6 +55,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float roundTransitionDuration = 2f;
     private Dictionary<string, GameObject> _playingCards;
     private List<Texture2D> _backgrounds;
+    public int Balance;
     
     private PlayerData _p1;
     private PlayerData _p2;
@@ -75,6 +76,7 @@ public class GameManager : MonoBehaviour
         {
             if (_instance != null && _instance != value)
             {
+                Debug.Log("Another Instance has beed detected");
                 Destroy(value.gameObject);
             }
             _instance = value;
@@ -89,11 +91,11 @@ public class GameManager : MonoBehaviour
         OnScoreChanged += ScoreChanged;
         _playingCards = _playingCardsSO.PlayingCardsDict;
         _backgrounds = _playingCardsSO.Backgrounds;
+        //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
     }
-
     private void Start()
     {
-        PlayerPrefs.SetInt("myCurrency", 1000);
+        
     }
 
     private void OnSceneLoaded(Scene scene,LoadSceneMode mode)
@@ -101,12 +103,21 @@ public class GameManager : MonoBehaviour
         switch (scene.name)
         {
             case "WelcomeScene":
+                Debug.Log(PlayerPrefs.GetInt("myCurrency").ToString());
+                Debug.Log(PlayerPrefs.GetInt("PurchasedBK1").ToString());
+                Debug.Log(PlayerPrefs.GetInt("PurchasedBK2").ToString());
+                Debug.Log(PlayerPrefs.GetInt("PurchasedBK3").ToString());
                 GameObject.Find("StoreBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("StoreScene"));
                 //Change these for multiplayer
                 GameObject.Find("HostBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("GameScene"));
                 GameObject.Find("JoinBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("GameScene"));
+                GameObject.Find("ResetData").GetComponent<Button>().onClick.AddListener(() => ResetData());
                 break;
             case "GameScene":
+                if (PlayerPrefs.GetInt("ActiveBK1") == 1)
+                {
+                    Debug.Log("Player Activate BK1");
+                }
                 _playBtnP1 = GameObject.Find("PlayBtnP1").GetComponent<Button>();
                 _playBtnP2 = GameObject.Find("PlayBtnP2").GetComponent<Button>();
                 _p1 = new PlayerData(1,GameObject.Find("Player1").transform,GameObject.Find("P1Score").GetComponent<TMP_Text>(), new Card());
@@ -145,6 +156,18 @@ public class GameManager : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
         OnCardAnimationFinished -= CardAnimationFinished;
         OnScoreChanged -= ScoreChanged;
+    }
+
+    public void ResetData() 
+    {
+        Debug.Log("ResetData");
+        PlayerPrefs.SetInt("myCurrency", 1000);
+        PlayerPrefs.SetInt("PurchasedBK1", 0);
+        PlayerPrefs.SetInt("PurchasedBK2", 0);
+        PlayerPrefs.SetInt("PurchasedBK3", 0);
+        PlayerPrefs.SetInt("ActiveBK1", 0);
+        PlayerPrefs.SetInt("ActiveBK2", 0);
+        PlayerPrefs.SetInt("ActiveBK3", 0);
     }
 
     public void SpawnCards()
