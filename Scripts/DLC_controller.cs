@@ -147,10 +147,7 @@ public class DLC_controller : MonoBehaviour
                 return Currency;
             }
 
-            void ActiveBK_btn()
-            {
-                //in this method change the player prefs of the active pic;
-            }
+            
 
             if (PlayerPrefs.GetInt("PurchasedBK1") == 1) 
             {
@@ -186,8 +183,34 @@ public class DLC_controller : MonoBehaviour
 
             }
 
+            void ActiveBK_btn()
+            {
+                //in this method change the player prefs of the active pic;
+                if (a.Name == "Pic 1")
+                {
+                    Debug.Log("Active bk1");
+                    PlayerPrefs.SetInt("ActiveBK1", 1);
+                    PlayerPrefs.SetInt("ActiveBK2", 0);
+                    PlayerPrefs.SetInt("ActiveBK3", 0);
+                }
+                if (a.Name == "Pic 2")
+                {
+                    Debug.Log("Active bk2");
+                    PlayerPrefs.SetInt("ActiveBK2", 1);
+                    PlayerPrefs.SetInt("ActiveBK1", 0);
+                    PlayerPrefs.SetInt("ActiveBK3", 0);
+                }
+                if (a.Name == "Pic 3")
+                {
+                    Debug.Log("Active bk3");
+                    PlayerPrefs.SetInt("ActiveBK3", 1);
+                    PlayerPrefs.SetInt("ActiveBK2", 0);
+                    PlayerPrefs.SetInt("ActiveBK1", 0);
+                }
+            }
+
             saleItem.transform.GetChild(4).GetComponent<Button>().onClick.AddListener(() => DeductBalance());
-            saleItem.transform.GetChild(5).GetComponent<Button>().onClick.AddListener(() => Debug.Log("Acitve background button for " + a.Name));
+            saleItem.transform.GetChild(5).GetComponent<Button>().onClick.AddListener(() => ActiveBK_btn());
         }
     }
 
