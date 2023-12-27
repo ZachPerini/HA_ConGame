@@ -10,7 +10,7 @@ public class GameManagerEditor : Editor
 
         if(GUILayout.Button("Spawn Cards"))
         {
-            GameManager.Singleton.SpawnCards();
+            GameManager.Singleton.SpawnCardsClientRpc();
         }
     }
 }

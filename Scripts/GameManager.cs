@@ -4,12 +4,16 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using Unity.Netcode;
+using Unity.Networking.Transport;
 using Unity.VisualScripting;
+using UnityEditor;
+using UnityEditor.Networking.PlayerConnection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using static UnityEditor.Experimental.GraphView.GraphView;
 using Random = UnityEngine.Random;
+using Firebase.Database;
 
 public enum CardAnimation
 {
@@ -40,6 +44,7 @@ public struct PlayerData
     public Transform PlayerGameObject;
     public TMP_Text PlayerScoreUI;
     public Card Card;
+
     public int Score;
     public PlayerData(int playerId, Transform playerGameObject,TMP_Text playerScoreUI, Card card)
     {
@@ -54,7 +59,7 @@ public struct PlayerData
 public class GameManager : NetworkBehaviour
 {
     [SerializeField] private PlayingCardsSO _playingCardsSO;
-    [SerializeField] private int maximumScore = 5;
+    [SerializeField] private int maximumScore = 3;
     [SerializeField] private float animationDuration = 2f;
     [SerializeField] private float roundTransitionDuration = 2f;
     [SerializeField] private GameObject playerPrefabA; //add prefab in inspector
@@ -67,12 +72,24 @@ public class GameManager : NetworkBehaviour
     public GameObject bk_3;
     public GameObject popupWindow;
     public GameObject SpriteAnchor;
+    GameObject p2Score;
     GameObject newPlayer;
     private PlayerData _p1;
     private PlayerData _p2;
+    private TextMeshProUGUI timeText;
+    private NetworkVariable<float> time = new NetworkVariable<float>(0.0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private Coroutine timerCoroutine;
+
+    public string winner;
+    public string loser;
 
     private Button _playBtnP1;
     private Button _playBtnP2;
+
+    private static DatabaseReference _rtdReference;
+
+
+    [SerializeField] private string _gameId;
 
     GameObject player_1;
     GameObject player_2;
@@ -86,7 +103,7 @@ public class GameManager : NetworkBehaviour
     private event CardAnimationFinishedDelegate OnCardAnimationFinished;
     private delegate void ScoreChangedDelegate(PlayerData player);
     private event ScoreChangedDelegate OnScoreChanged;
-    
+
     private static GameManager _instance;
     private NetworkObject netObj;
     private bool spawnClient;
@@ -114,6 +131,12 @@ public class GameManager : NetworkBehaviour
         _playingCards = _playingCardsSO.PlayingCardsDict;
         _backgrounds = _playingCardsSO.Backgrounds;
         //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
+        _rtdReference = FirebaseDatabase.DefaultInstance.RootReference;
+    }
+
+    public static string GenerateGameId()
+    {
+        return "Game: " + Guid.NewGuid().ToString();
     }
 
     [ServerRpc(RequireOwnership = false)] //server owns this object but client can request a spawn
@@ -148,7 +171,8 @@ public class GameManager : NetworkBehaviour
     {
         popupWindow.SetActive(false);
         Debug.Log("All players joined");
-        //_p2 = new PlayerData(2, GameObject.Find("Player2(Clone)").transform, GameObject.Find("P2Score").GetComponent<TMP_Text>(), new Card());
+        timerCoroutine = StartCoroutine(StartTimer());
+        doServerRpc();
     }
 
     public void OnHostBTNClicked()
@@ -156,44 +180,40 @@ public class GameManager : NetworkBehaviour
         NetworkManager.Singleton.StartHost();
         if (NetworkManager.IsServer)
         {
-            //popupWindow.SetActive(true);
+            
             NetworkManager.Singleton.SceneManager.LoadScene("GameScene", LoadSceneMode.Single);
         }
     }
+
     public void OnJoinBTNClicked()
     {
         NetworkManager.Singleton.StartClient();
-        //popupWindow.SetActive(false);
-        //NetworkManager.Singleton.SceneManager.LoadScene("GameScene", LoadSceneMode.Single);
+        
     }
 
-
+    IEnumerator StartTimer()
+    {
+        while (true)
+        {
+            time.Value += Time.deltaTime;
+            //timeText.text = "Time: " + time.Value.ToString("0.00");
+            yield return null;
+        }
+    }
 
     private void OnSceneLoaded(Scene scene,LoadSceneMode mode)
     {
         switch (scene.name)
         {
             case "WelcomeScene":
-                //popupWindow = GameObject.FindGameObjectWithTag("PopUp");
-                //popupWindow.SetActive(false);
-                Debug.Log(PlayerPrefs.GetInt("myCurrency").ToString());
-                Debug.Log(PlayerPrefs.GetInt("PurchasedBK1").ToString());
-                Debug.Log(PlayerPrefs.GetInt("PurchasedBK2").ToString());
-                Debug.Log(PlayerPrefs.GetInt("PurchasedBK3").ToString());
-                GameObject.Find("StoreBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("StoreScene"));
-                //Change these for multiplayer
-                //GameObject.Find("HostBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("GameScene"));
+                GameObject.Find("StoreBtn").GetComponent<Button>().onClick.AddListener(() => SceneManager.LoadSceneAsync("StoreScene"));
                 GameObject.Find("HostBtn").GetComponent<Button>().onClick.AddListener(() => OnHostBTNClicked());
-                //GameObject.Find("JoinBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("GameScene"));
                 GameObject.Find("JoinBtn").GetComponent<Button>().onClick.AddListener(() => OnJoinBTNClicked());
                 GameObject.Find("ResetData").GetComponent<Button>().onClick.AddListener(() => ResetData());
+                //NetworkManager.Singleton.Shutdown();
                 break;
             case "GameScene":
-                
-                
-                
-                //player_1.transform.parent = SpriteAnchor.transform;
-                //player_2.transform.parent = SpriteAnchor.transform;
+                //timeText = GameObject.Find("Timer").GetComponent<TextMeshProUGUI>();
                 if (PlayerPrefs.GetInt("ActiveBK1") == 1)
                 {
                     Instantiate(bk_1);
@@ -206,88 +226,138 @@ public class GameManager : NetworkBehaviour
                 {
                     Instantiate(bk_3);
                 }
-
-                //GameObject player_1 = GameObject.Find("Player1(Clone)");
-                //GameObject player_2 = GameObject.Find("Player2(Clone)");
                 if (IsServer)
                 {
-
                     popupWindow = GameObject.FindGameObjectWithTag("PopUp");
-                    SpriteAnchor = GameObject.FindGameObjectWithTag("Anchor");
-                    //player_1.transform.parent = SpriteAnchor.transform;
                     popupWindow.SetActive(true);
                     NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-                    //player_1 = GameObject.Find("Player1(Clone)");
-                    _playBtnP1 = GameObject.Find("PlayBtnP1").GetComponent<Button>();
-                    _p1 = new PlayerData(1, GameObject.Find("Player1(Clone)").transform, GameObject.Find("P1Score").GetComponent<TMP_Text>(), new Card());
-                    _playBtnP1.onClick.AddListener(() =>
-                    {
-                        _playBtnP1.enabled = false;
-                        //StartCoroutine(RotateCard(_p1));
-                        Debug.Log("Player 1 played");
-                    });
                 }
                 if (!IsServer)
                 {
-                    SpriteAnchor = GameObject.FindGameObjectWithTag("Anchor");
                     popupWindow = GameObject.FindGameObjectWithTag("PopUp");
-                    //player_2.transform.parent = SpriteAnchor.transform;
                     popupWindow.SetActive(false);
-                    player_2 = GameObject.Find("Player2(Clone)");
-                    _playBtnP2 = GameObject.Find("PlayBtnP2").GetComponent<Button>();
-                    _p2 = new PlayerData(2, GameObject.Find("Player1(Clone)").transform, GameObject.Find("P2Score").GetComponent<TMP_Text>(), new Card());
-                    _playBtnP2.onClick.AddListener(() =>
-                    {
-                        _playBtnP2.enabled = false;
-                        //StartCoroutine(RotateCard(_p2));
-                        
-                        Debug.Log("Player 2 played");
-                    });
+                    //NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
                 }
-
-                //_playBtnP1 = GameObject.Find("PlayBtnP1").GetComponent<Button>();
-                //_playBtnP2 = GameObject.Find("PlayBtnP2").GetComponent<Button>();
-                // _p1 = new PlayerData(1,GameObject.Find("Player1(Clone)").transform,GameObject.Find("P1Score").GetComponent<TMP_Text>(), new Card());
-                // _p2 = new PlayerData(2, GameObject.Find("Player2(Clone)").transform,GameObject.Find("P2Score").GetComponent<TMP_Text>(), new Card());
-                //_playBtnP1.onClick.AddListener(() =>
-                //{
-                //    _playBtnP1.enabled = false;
-                //    StartCoroutine(RotateCard(_p1));
-                //    Debug.Log("Player 1 played");
-                //});
-                //_playBtnP2.onClick.AddListener(() =>
-                //{
-                //    _playBtnP2.enabled = false;
-                //    StartCoroutine(RotateCard(_p2));
-                //    Debug.Log("Player 2 played");
-                //});
-
-                //SpawnCards();
-
                 break;
             case "ScoreScene":
                 GameObject.Find("BackBtn").GetComponent<Button>().onClick.AddListener(()=>SceneManager.LoadSceneAsync("WelcomeScene"));
                 TMP_Text result = GameObject.Find("Winner").GetComponent<TMP_Text>();
-                if (_p1.Score > _p2.Score)
+                
+                if (timerCoroutine != null)
                 {
-                    result.text = "Player 1 Wins!";
+                    StopCoroutine(timerCoroutine);
+                    timerCoroutine = null;
                 }
-                else
+                Debug.Log(time.Value.ToString());
+                if (IsServer)
                 {
-                    result.text = "Player 2 Wins!";
+                    player_1.GetComponent<NetworkObject>().Despawn();
+                    player_2.GetComponent<NetworkObject>().Despawn();
+                    //save to realtime
+                    if (_p1.Score > _p2.Score)
+                    {
+                        result.text = "Player 1 Wins!";
+                        _gameId = GenerateGameId();
+                        winner = "Player 1";
+                        loser = "Player 2";
+                        GameData data = new GameData(_gameId, winner, loser, time.Value.ToString());
+                        string json = JsonUtility.ToJson(data);
+                        _rtdReference.Child("Games").Child(_gameId).Child("Timestamp: " + data.Timestamp.ToString()).Child("Winner: " + data.Winner).Child("Loser: " + data.Loser).SetRawJsonValueAsync(json);
+                        Debug.Log(winner);
+                        //NetworkManager.Singleton.Shutdown();
+                    }
+                    else
+                    {
+                        result.text = "Player 2 Wins!";
+                        _gameId = GenerateGameId();
+                        winner = "Player 2";
+                        loser = "Player 1";
+                        GameData data = new GameData(_gameId, winner, loser, time.Value.ToString());
+                        string json = JsonUtility.ToJson(data);
+                        _rtdReference.Child("Games").Child(_gameId).Child("Timestamp: " + data.Timestamp.ToString()).Child("Winner: " + data.Winner).Child("Loser: " + data.Loser).SetRawJsonValueAsync(json);
+                        Debug.Log(winner);
+                        //NetworkManager.Singleton.Shutdown();
+                    }
                 }
+                if (!IsServer)
+                {
+                    //player_1.GetComponent<NetworkObject>().Despawn();
+                    //player_2.GetComponent<NetworkObject>().Despawn();
+                }
+                //NetworkManager.Singleton.Shutdown();
                 break;
             case "StoreScene":
                 break;
         }
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void doServerRpc(ServerRpcParams rpcParams = default)
+    {
+        doClientRpc();
+    }
+
+    [ClientRpc]
+    public void doClientRpc()
+    {
+        Debug.Log("I called this from doClientRPC");
+        player_1 = GameObject.FindGameObjectWithTag("Player1");
+        _playBtnP1 = GameObject.Find("PlayBtnP1").GetComponent<Button>();
+        _p1 = new PlayerData(1, player_1.transform, GameObject.FindGameObjectWithTag("p1Score").GetComponent<TMP_Text>(), new Card());
+        player_2 = GameObject.FindGameObjectWithTag("Player2");
+        _playBtnP2 = GameObject.Find("PlayBtnP2").GetComponent<Button>();
+        _p2 = new PlayerData(2, player_2.transform, GameObject.FindGameObjectWithTag("p2Score").GetComponent<TMP_Text>(), new Card());
+        if (IsServer)
+        {
+            //_playBtnP2.enabled = false;
+            _playBtnP1.onClick.AddListener(() =>
+            {
+                player1PlayedClientRpc();
+            });
+            //_playBtnP1.enabled = false;
+            _playBtnP2.onClick.AddListener(() =>
+            {
+                Debug.Log("clicked p2 button");
+                player2PlayedClientRpc();
+            });
+        }
+        if (!IsServer)
+        {
+            //_playBtnP1.enabled = false;
+            //_playBtnP2.onClick.AddListener(() =>
+            //{
+            //    Debug.Log("clicked p2 button");
+            //    player2PlayedClientRpc();
+            //});
+        }
+        SpawnCardsClientRpc();
+    }
+
+    [ClientRpc]
+    public void player1PlayedClientRpc()
+    {
+        _playBtnP1.enabled = false;
+        StartCoroutine(RotateCard(_p1));
+        Debug.Log("Player 1 played");
+    }
+
+    [ClientRpc]
+    public void player2PlayedClientRpc()
+    {
+        _playBtnP2.enabled = false;
+        StartCoroutine(RotateCard(_p2));
+        Debug.Log("Player 2 played");
+    }
     
+
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
         OnCardAnimationFinished -= CardAnimationFinished;
         OnScoreChanged -= ScoreChanged;
     }
+
+    
 
     public void ResetData() 
     {
@@ -301,8 +371,10 @@ public class GameManager : NetworkBehaviour
         PlayerPrefs.SetInt("ActiveBK3", 0);
     }
 
-    public void SpawnCards()
+    [ClientRpc]
+    public void SpawnCardsClientRpc()
     {
+        Debug.Log("Spawn Cards");
         DestroyCard(_p1);
         //Pick random card
         Card randCard = PickRandomCard();
@@ -363,7 +435,10 @@ public class GameManager : NetworkBehaviour
         player.PlayerScoreUI.text = $"P{player.PlayerId}: {IncrementScore(player.PlayerId)}";
         if (_p1.Score == maximumScore || _p2.Score == maximumScore)
         {
-            NetworkManager.Singleton.SceneManager.LoadScene("ScoreScene", LoadSceneMode.Single);
+            if (IsServer)
+            {
+                NetworkManager.Singleton.SceneManager.LoadScene("ScoreScene", LoadSceneMode.Single);
+            }
         }
         else
         {
@@ -374,6 +449,7 @@ public class GameManager : NetworkBehaviour
     private Card PickRandomCard()
     {
         int rand = Random.Range(0, _playingCards.Count);
+        
         return new Card(_playingCards.ElementAt(rand).Key, _playingCards.ElementAt(rand).Value);
     }
 
@@ -416,7 +492,7 @@ public class GameManager : NetworkBehaviour
     IEnumerator TransitionNextRound(float duration)
     {
         yield return new WaitForSeconds(duration);
-        SpawnCards();
+        SpawnCardsClientRpc();
         _playBtnP1.enabled = true;
         _playBtnP2.enabled = true;
     }

@@ -23,6 +23,7 @@ public class DLC_controller : MonoBehaviour
     public GameObject MenuBtn;
     GameManager gameManager;
     //private RawImage _image;
+    public Slider progressBar;
 
     // Start is called before the first frame update
     void Start()
@@ -34,6 +35,11 @@ public class DLC_controller : MonoBehaviour
         Debug.Log("My Currency is: " + Currency.ToString());
         MenuBtn.GetComponent<Button>().onClick.AddListener(() => SceneManager.LoadSceneAsync("WelcomeScene"));
         //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
+    }
+
+    public void UpdateProgressBar(float progress)
+    {
+        progressBar.value = progress;
     }
 
     public void DownloadFile(StorageReference reference)
@@ -85,7 +91,41 @@ public class DLC_controller : MonoBehaviour
                 rawImage.transform.parent.gameObject.SetActive(true);
             }
         });
+
+
+
     }
+
+    public void DownloadMainImage(StorageReference reference, string FileName)
+    {
+        // Download in memory with a maximum allowed size of 6MB (6 * 1024 * 1024 bytes)
+        const long maxAllowedSize = 6 * 1024 * 1024;
+        // Start downloading a file
+        Task<byte[]> task = reference.GetBytesAsync(maxAllowedSize,
+            new StorageProgress<DownloadState>(state =>
+            {
+                progressBar.value = state.BytesTransferred;
+                progressBar.maxValue = state.TotalByteCount;
+            }), CancellationToken.None);
+
+        task.ContinueWithOnMainThread(resultTask => 
+        {
+            if (resultTask.IsFaulted || resultTask.IsCanceled)
+            {
+                Debug.LogException(resultTask.Exception);
+                // Uh-oh, an error occurred!
+            }
+            else
+            {
+                byte[] fileContents = resultTask.Result;
+                string path = $"Assets/Resources/{FileName}.jpg";
+                System.IO.File.WriteAllBytes(path, fileContents);
+                Debug.Log("Finished downloading Main Image");
+            }
+        });
+    }
+
+
 
     public void ReadManifest(string path)
     {
@@ -107,7 +147,7 @@ public class DLC_controller : MonoBehaviour
             saleItem.transform.GetChild(5).gameObject.SetActive(false);
 
             Debug.Log(repository.BaseUrl + '/' + a.Image);
-            DownloadImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Image + ".jpg"), rawImg);
+            DownloadImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Image + ".png"), rawImg);
 
             int DeductBalance()
             {   if (Currency < a.Price)
@@ -126,6 +166,8 @@ public class DLC_controller : MonoBehaviour
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
+                        Debug.Log("Downloading" + a.Name);
+                        DownloadMainImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Main_Image + ".jpg"), a.Main_Image);
                     }
                     if (a.Name == "Pic 2")
                     {
@@ -133,6 +175,7 @@ public class DLC_controller : MonoBehaviour
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
+                        DownloadMainImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Main_Image + ".jpg"), a.Main_Image);
                     }
                     if (a.Name == "Pic 3")
                     {
@@ -140,6 +183,7 @@ public class DLC_controller : MonoBehaviour
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
+                        DownloadMainImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Main_Image + ".jpg"), a.Main_Image);
                     }
                     PlayerPrefs.SetInt("myCurrency", Currency);
                     return newBalance;
@@ -157,6 +201,7 @@ public class DLC_controller : MonoBehaviour
                     Debug.Log("I bought pic 1 already");
                     saleItem.transform.GetChild(5).gameObject.SetActive(true);
                     saleItem.transform.GetChild(4).gameObject.SetActive(false);
+                    
                 }
                 
             }

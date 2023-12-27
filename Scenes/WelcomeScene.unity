@@ -286,6 +286,9 @@ MonoBehaviour:
   bk_3: {fileID: 5989195333003833629, guid: c18c40e2d072a89408e1829bea4a6441, type: 3}
   popupWindow: {fileID: 0}
   SpriteAnchor: {fileID: 4541075129376603199, guid: dcd399889f5f1924bbe538f6f35518fc, type: 3}
+  winner: 
+  loser: 
+  _gameId: 
   requiredPlayers: 2
   PlayerCount: 0
 --- !u!4 &124804485
