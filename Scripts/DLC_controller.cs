@@ -1,40 +1,66 @@
 using Firebase.Storage;
 using Firebase.Extensions;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using System.Threading;
 using System;
 using System.Threading.Tasks;
 using UnityEngine.UI;
-using System.Xml.Linq;
-using System.Security.Cryptography;
 using TMPro;
 using UnityEngine.SceneManagement;
+using Firebase.Database;
+
 
 public class DLC_controller : MonoBehaviour
 {
     private FirebaseStorage _instance;
+    private static DatabaseReference _rtdReference;
     [SerializeField] private GameObject SaleItemPrefab;
     [SerializeField] private GameObject SaleItemGroup;
     int Currency;
     private TextMeshProUGUI currencyText;
     public GameObject MenuBtn;
+    public GameObject effect;
     GameManager gameManager;
     //private RawImage _image;
     public Slider progressBar;
+    [SerializeField] private string _playerId;
 
     // Start is called before the first frame update
     void Start()
     {
         _instance = FirebaseStorage.DefaultInstance;
+        _rtdReference = FirebaseDatabase.DefaultInstance.RootReference;
         DownloadFile(_instance.GetReferenceFromUrl("gs://homeassignment-ea4dc.appspot.com/Manifest.xml"));
         Currency = PlayerPrefs.GetInt("myCurrency");
         currencyText = GameObject.Find("Currency").GetComponent<TextMeshProUGUI>();
         Debug.Log("My Currency is: " + Currency.ToString());
         MenuBtn.GetComponent<Button>().onClick.AddListener(() => SceneManager.LoadSceneAsync("WelcomeScene"));
         //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
+        string _savedPlayerId = PlayerPrefs.GetString("myKey");
+
+        if (!String.IsNullOrEmpty(_savedPlayerId))
+        {
+            _playerId = _savedPlayerId;
+        }
+        else
+        {
+            _playerId = GenerateUserId();
+            PlayerPrefs.SetString("PlayerID", _playerId);
+        }
+
+    }
+
+    public static string GenerateUserId()
+    {
+        return Guid.NewGuid().ToString();
+    }
+
+    public void SaveNewAction(string userAction)
+    {
+        PurchaseData data = new PurchaseData(_playerId, userAction);
+        string json = JsonUtility.ToJson(data);
+        _rtdReference.Child("Purchases").Child(_playerId).Child(data.Timestamp).SetRawJsonValueAsync(json);
+        //Dictionary<string, System.Object> playerDict = data.ToDictionary();
     }
 
     public void UpdateProgressBar(float progress)
@@ -121,6 +147,8 @@ public class DLC_controller : MonoBehaviour
                 string path = $"Assets/Resources/{FileName}.jpg";
                 System.IO.File.WriteAllBytes(path, fileContents);
                 Debug.Log("Finished downloading Main Image");
+                GameObject go = Instantiate(effect);
+                Destroy(go, 5); //Destroy after 5 seconds.
             }
         });
     }
@@ -160,26 +188,29 @@ public class DLC_controller : MonoBehaviour
                 {
                     int newBalance = Currency -= a.Price;
                     Debug.Log("My New Balance is: " + Currency.ToString());
-                    if (a.Name == "Pic 1")
+                    if (a.Name == "Background 1")
                     {
                         PlayerPrefs.SetInt("PurchasedBK1", 1);
+                        SaveNewAction("PURCHASE_BK1");
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
                         Debug.Log("Downloading" + a.Name);
                         DownloadMainImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Main_Image + ".jpg"), a.Main_Image);
                     }
-                    if (a.Name == "Pic 2")
+                    if (a.Name == "Background 2")
                     {
                         PlayerPrefs.SetInt("PurchasedBK2", 1);
+                        SaveNewAction("PURCHASE_BK2");
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
                         DownloadMainImage(_instance.GetReferenceFromUrl(repository.BaseUrl + '/' + a.Main_Image + ".jpg"), a.Main_Image);
                     }
-                    if (a.Name == "Pic 3")
+                    if (a.Name == "Background 3")
                     {
                         PlayerPrefs.SetInt("PurchasedBK3", 1);
+                        SaveNewAction("PURCHASE_BK3");
                         saleItem.transform.GetChild(5).gameObject.SetActive(true);
                         saleItem.transform.GetChild(4).gameObject.SetActive(false);
                         Debug.Log("Player baught" + a.Name);
@@ -196,7 +227,7 @@ public class DLC_controller : MonoBehaviour
             if (PlayerPrefs.GetInt("PurchasedBK1") == 1) 
             {
                 //right now its setting active all the buttons i need to change this code to make only the correpsonding item active
-                if (a.Name == "Pic 1")
+                if (a.Name == "Background 1")
                 {
                     Debug.Log("I bought pic 1 already");
                     saleItem.transform.GetChild(5).gameObject.SetActive(true);
@@ -208,7 +239,7 @@ public class DLC_controller : MonoBehaviour
             if (PlayerPrefs.GetInt("PurchasedBK2") == 1)
             {
                 //right now its setting active all the buttons i need to change this code to make only the correpsonding item active
-                if (a.Name == "Pic 2")
+                if (a.Name == "Background 2")
                 {
                     Debug.Log("I bought pic 2 already");
                     saleItem.transform.GetChild(5).gameObject.SetActive(true);
@@ -219,7 +250,7 @@ public class DLC_controller : MonoBehaviour
             if (PlayerPrefs.GetInt("PurchasedBK3") == 1)
             {
                 //right now its setting active all the buttons i need to change this code to make only the correpsonding item active
-                if (a.Name == "Pic 3")
+                if (a.Name == "Background 3")
                 {
                     Debug.Log("I bought pic 2 already");
                     saleItem.transform.GetChild(5).gameObject.SetActive(true);
@@ -231,21 +262,21 @@ public class DLC_controller : MonoBehaviour
             void ActiveBK_btn()
             {
                 //in this method change the player prefs of the active pic;
-                if (a.Name == "Pic 1")
+                if (a.Name == "Background 1")
                 {
                     Debug.Log("Active bk1");
                     PlayerPrefs.SetInt("ActiveBK1", 1);
                     PlayerPrefs.SetInt("ActiveBK2", 0);
                     PlayerPrefs.SetInt("ActiveBK3", 0);
                 }
-                if (a.Name == "Pic 2")
+                if (a.Name == "Background 2")
                 {
                     Debug.Log("Active bk2");
                     PlayerPrefs.SetInt("ActiveBK2", 1);
                     PlayerPrefs.SetInt("ActiveBK1", 0);
                     PlayerPrefs.SetInt("ActiveBK3", 0);
                 }
-                if (a.Name == "Pic 3")
+                if (a.Name == "Background 3")
                 {
                     Debug.Log("Active bk3");
                     PlayerPrefs.SetInt("ActiveBK3", 1);

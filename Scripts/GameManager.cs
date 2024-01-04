@@ -4,14 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using Unity.Netcode;
-using Unity.Networking.Transport;
-using Unity.VisualScripting;
-using UnityEditor;
-using UnityEditor.Networking.PlayerConnection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using static UnityEditor.Experimental.GraphView.GraphView;
 using Random = UnityEngine.Random;
 using Firebase.Database;
 
@@ -107,31 +102,53 @@ public class GameManager : NetworkBehaviour
     private static GameManager _instance;
     private NetworkObject netObj;
     private bool spawnClient;
+    
 
-    public static GameManager Singleton
+    // Public property to access the GameManager instance
+    public static GameManager Instance
     {
-        get  => _instance;
-        private set
+        get
         {
-            if (_instance != null && _instance != value)
+            // If there is no instance yet, find one or create a new one
+            if (_instance == null)
             {
-                Debug.Log("Another Instance has beed detected");
-                Destroy(value.gameObject);
+                _instance = FindObjectOfType<GameManager>();
+
+                // If no instance was found in the scene, create a new GameObject and attach the GameManager script
+                if (_instance == null)
+                {
+                    GameObject singletonObject = new GameObject("GameManager");
+                    _instance = singletonObject.AddComponent<GameManager>();
+                }
             }
-            _instance = value;
-            DontDestroyOnLoad(value);
+
+            return _instance;
         }
     }
+
+    // Any other variables and methods you want for your GameManager can go below
+
     private void Awake()
     {
-        Singleton = this;
-        SceneManager.sceneLoaded += OnSceneLoaded;
-        OnCardAnimationFinished += CardAnimationFinished;
-        OnScoreChanged += ScoreChanged;
-        _playingCards = _playingCardsSO.PlayingCardsDict;
-        _backgrounds = _playingCardsSO.Backgrounds;
-        //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
-        _rtdReference = FirebaseDatabase.DefaultInstance.RootReference;
+        // Ensure that there is only one instance of the GameManager
+        if (_instance != null && _instance != this)
+        {
+            Destroy(this.gameObject);
+        }
+        else
+        {
+            _instance = this;
+            DontDestroyOnLoad(this.gameObject); // This ensures that the GameManager persists between scenes
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            OnCardAnimationFinished += CardAnimationFinished;
+            OnScoreChanged += ScoreChanged;
+            _playingCards = _playingCardsSO.PlayingCardsDict;
+            _backgrounds = _playingCardsSO.Backgrounds;
+            //DONT FORGET TO PRESS RESET DATA BUTTON WHEN ENTERING PLAYMODE
+            _rtdReference = FirebaseDatabase.DefaultInstance.RootReference;
+            if (!PlayerPrefs.HasKey("myCurrency"))
+                PlayerPrefs.SetInt("myCurrency", 1000);
+        }
     }
 
     public static string GenerateGameId()
@@ -258,37 +275,32 @@ public class GameManager : NetworkBehaviour
                     {
                         result.text = "Player 1 Wins!";
                         _gameId = GenerateGameId();
-                        winner = "Player 1";
-                        loser = "Player 2";
-                        GameData data = new GameData(_gameId, winner, loser, time.Value.ToString());
-                        string json = JsonUtility.ToJson(data);
-                        _rtdReference.Child("Games").Child(_gameId).Child("Timestamp: " + data.Timestamp.ToString()).Child("Winner: " + data.Winner).Child("Loser: " + data.Loser).SetRawJsonValueAsync(json);
+                        SaveNewAction("Player 1", "Player 2", time.Value.ToString());
                         Debug.Log(winner);
-                        //NetworkManager.Singleton.Shutdown();
                     }
                     else
                     {
                         result.text = "Player 2 Wins!";
                         _gameId = GenerateGameId();
-                        winner = "Player 2";
-                        loser = "Player 1";
-                        GameData data = new GameData(_gameId, winner, loser, time.Value.ToString());
-                        string json = JsonUtility.ToJson(data);
-                        _rtdReference.Child("Games").Child(_gameId).Child("Timestamp: " + data.Timestamp.ToString()).Child("Winner: " + data.Winner).Child("Loser: " + data.Loser).SetRawJsonValueAsync(json);
-                        Debug.Log(winner);
-                        //NetworkManager.Singleton.Shutdown();
+                        SaveNewAction("Player 2", "Player 1", time.Value.ToString());
+                        Debug.Log(winner);   
                     }
                 }
                 if (!IsServer)
                 {
-                    //player_1.GetComponent<NetworkObject>().Despawn();
-                    //player_2.GetComponent<NetworkObject>().Despawn();
                 }
-                //NetworkManager.Singleton.Shutdown();
                 break;
             case "StoreScene":
                 break;
         }
+    }
+
+    public void SaveNewAction(string winner, string loser, string duration)
+    {
+        GameData data = new GameData(_gameId, winner, loser, duration);
+        string json = JsonUtility.ToJson(data);
+        _rtdReference.Child("Games").Child(_gameId).Child(data.Timestamp).SetRawJsonValueAsync(json);
+        //Dictionary<string, System.Object> playerDict = data.ToDictionary();
     }
 
     [ServerRpc(RequireOwnership = false)]
