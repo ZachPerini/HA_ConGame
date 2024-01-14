@@ -9,6 +9,8 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
 using Firebase.Database;
+using System.Globalization;
+using System.IO;
 
 public enum CardAnimation
 {
@@ -82,6 +84,9 @@ public class GameManager : NetworkBehaviour
     private Button _playBtnP2;
 
     private static DatabaseReference _rtdReference;
+
+    public Image BK_img;
+    public String image_path;
 
 
     [SerializeField] private string _gameId;
@@ -231,17 +236,73 @@ public class GameManager : NetworkBehaviour
                 break;
             case "GameScene":
                 //timeText = GameObject.Find("Timer").GetComponent<TextMeshProUGUI>();
+                BK_img = GameObject.Find("BK").GetComponent<Image>();
+                BK_img.color = new Color(255, 255, 255, 0);
                 if (PlayerPrefs.GetInt("ActiveBK1") == 1)
                 {
-                    Instantiate(bk_1);
+                    //Instantiate(bk_1);
+                    image_path = Path.Combine(Application.persistentDataPath, "BK_1.jpg");
+                    if (File.Exists(image_path))
+                    {
+                        byte[] imageData = File.ReadAllBytes(image_path);
+                        Texture2D texture = new Texture2D(2, 2); // Adjust the size accordingly
+                        texture.LoadImage(imageData);
+
+                        //Convert the Texture2D to a Sprite;
+                        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * 0.5f);
+
+                        // Set the Sprite for the UI Image component
+                        BK_img.color = new Color(255, 255, 255, 255);
+                        BK_img.sprite = sprite;
+                    }
+                    else
+                    {
+                        Debug.LogError("Image file not found: " + image_path);
+                    }
                 }
                 if (PlayerPrefs.GetInt("ActiveBK2") == 1)
                 {
-                    Instantiate(bk_2);
+                    //Instantiate(bk_2);
+                    image_path = Path.Combine(Application.persistentDataPath, "BK_2.jpg");
+                    if (File.Exists(image_path))
+                    {
+                        byte[] imageData = File.ReadAllBytes(image_path);
+                        Texture2D texture = new Texture2D(2, 2); // Adjust the size accordingly
+                        texture.LoadImage(imageData);
+
+                        //Convert the Texture2D to a Sprite;
+                        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * 0.5f);
+
+                        // Set the Sprite for the UI Image component
+                        BK_img.color = new Color(255, 255, 255, 255);
+                        BK_img.sprite = sprite;
+                    }
+                    else
+                    {
+                        Debug.LogError("Image file not found: " + image_path);
+                    }
                 }
                 if (PlayerPrefs.GetInt("ActiveBK3") == 1)
                 {
-                    Instantiate(bk_3);
+                    //Instantiate(bk_3);
+                    image_path = Path.Combine(Application.persistentDataPath, "BK_3.jpg");
+                    if (File.Exists(image_path))
+                    {
+                        byte[] imageData = File.ReadAllBytes(image_path);
+                        Texture2D texture = new Texture2D(2, 2); // Adjust the size accordingly
+                        texture.LoadImage(imageData);
+
+                        //Convert the Texture2D to a Sprite;
+                        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * 0.5f);
+
+                        // Set the Sprite for the UI Image component
+                        BK_img.color = new Color(255, 255, 255, 255);
+                        BK_img.sprite = sprite;
+                    }
+                    else
+                    {
+                        Debug.LogError("Image file not found: " + image_path);
+                    }
                 }
                 if (IsServer)
                 {

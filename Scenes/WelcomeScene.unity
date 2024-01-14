@@ -288,6 +288,8 @@ MonoBehaviour:
   SpriteAnchor: {fileID: 4541075129376603199, guid: dcd399889f5f1924bbe538f6f35518fc, type: 3}
   winner: 
   loser: 
+  BK_img: {fileID: 0}
+  image_path: 
   _gameId: 
   requiredPlayers: 2
   PlayerCount: 0

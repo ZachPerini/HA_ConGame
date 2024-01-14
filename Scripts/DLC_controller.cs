@@ -8,6 +8,8 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
 using Firebase.Database;
+using System.IO;
+
 
 
 public class DLC_controller : MonoBehaviour
@@ -126,6 +128,7 @@ public class DLC_controller : MonoBehaviour
     {
         // Download in memory with a maximum allowed size of 6MB (6 * 1024 * 1024 bytes)
         const long maxAllowedSize = 6 * 1024 * 1024;
+
         // Start downloading a file
         Task<byte[]> task = reference.GetBytesAsync(maxAllowedSize,
             new StorageProgress<DownloadState>(state =>
@@ -134,7 +137,7 @@ public class DLC_controller : MonoBehaviour
                 progressBar.maxValue = state.TotalByteCount;
             }), CancellationToken.None);
 
-        task.ContinueWithOnMainThread(resultTask => 
+        task.ContinueWithOnMainThread(resultTask =>
         {
             if (resultTask.IsFaulted || resultTask.IsCanceled)
             {
@@ -144,11 +147,34 @@ public class DLC_controller : MonoBehaviour
             else
             {
                 byte[] fileContents = resultTask.Result;
-                string path = $"Assets/Resources/{FileName}.jpg";
-                System.IO.File.WriteAllBytes(path, fileContents);
-                Debug.Log("Finished downloading Main Image");
-                GameObject go = Instantiate(effect);
-                Destroy(go, 5); //Destroy after 5 seconds.
+
+                // Create the directory if it doesn't exist
+                string directoryPath = Path.Combine(Application.persistentDataPath);
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                // Combine the directory and file name for the complete path
+                string filePath = Path.Combine(directoryPath, $"{FileName}.jpg");
+
+                // Check if the file already exists and handle it accordingly
+                if (File.Exists(filePath))
+                {
+                    Debug.LogWarning($"File {FileName}.jpg already exists. Skipping download.");
+                    GameObject go = Instantiate(effect);
+                    Destroy(go, 5); // Destroy after 5 seconds
+                }
+                else
+                {
+                    // Write the file contents to the specified path
+                    System.IO.File.WriteAllBytes(filePath, fileContents);
+                    Debug.Log($"Finished downloading Main Image. Saved at: {filePath}");
+
+                    // Instantiate an effect
+                    GameObject go = Instantiate(effect);
+                    Destroy(go, 5); // Destroy after 5 seconds
+                }
             }
         });
     }
